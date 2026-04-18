@@ -118,23 +118,16 @@ export default function ResultScreen() {
   };
 
   const foodData = {
-    name: resultLog ? resultLog.food_name : 'Greek Salad',
-    category: resultLog ? 'Analyzed Result' : 'Mediterranean Bowl',
-    serving: resultLog ? 'Standard' : '450g Serving',
+    name: resultLog ? (resultLog.food_name || resultLog.name) : 'Analyzing...',
+    category: resultLog ? 'Analyzed Result' : 'Loading',
+    serving: 'Standard Serving',
     confidence: 98,
-    calories: resultLog ? resultLog.calories : 342,
-    protein: resultLog ? resultLog.protein_g : 12,
-    carbs: resultLog ? resultLog.carbs_g : 18,
-    fat: resultLog ? resultLog.fat_g : 24,
-    micros: resultLog ? [
-      { icon: '🌾', name: 'Dietary Fiber', value: String(resultLog.fiber_g || '0'), unit: 'g', dv: '-' },
-    ] : [
-      { icon: '🌾', name: 'Dietary Fiber', value: '4.2', unit: 'g', dv: '15% DV' },
-      { icon: '🧂', name: 'Sodium', value: '840', unit: 'mg', dv: '35% DV' },
-      { icon: '🥛', name: 'Calcium', value: '120', unit: 'mg', dv: '10% DV' },
-      { icon: '🍊', name: 'Vitamin C', value: '28', unit: 'mg', dv: '31% DV' },
-      { icon: '🫘', name: 'Iron', value: '2.1', unit: 'mg', dv: '12% DV' },
-      { icon: '🥑', name: 'Potassium', value: '380', unit: 'mg', dv: '8% DV' },
+    calories: resultLog ? resultLog.calories : 0,
+    protein: resultLog ? (resultLog.protein_g ?? resultLog.protein ?? 0) : 0,
+    carbs: resultLog ? (resultLog.carbs_g ?? resultLog.carbs ?? 0) : 0,
+    fat: resultLog ? (resultLog.fat_g ?? resultLog.fat ?? 0) : 0,
+    micros: [
+      { icon: '🌾', name: 'Dietary Fiber', value: String(resultLog?.fiber_g ?? resultLog?.fiber ?? '0'), unit: 'g', dv: '-' },
     ],
   };
 
