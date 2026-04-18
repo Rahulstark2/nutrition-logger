@@ -1,22 +1,25 @@
 import { Tabs } from 'expo-router';
 import { View, Text } from 'react-native';
 import { Home, Camera, Clock, User } from 'lucide-react-native';
+import { useUserContext } from '../../context/UserContext';
 
 export default function TabLayout() {
+  const { colors } = useUserContext();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0B0B12',
+          backgroundColor: colors.tabBar,
           borderTopWidth: 1,
-          borderTopColor: '#1A1A2E',
+          borderTopColor: colors.tabBarBorder,
           height: 80,
           paddingBottom: 20,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#00D4AA',
-        tabBarInactiveTintColor: '#555570',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
@@ -32,7 +35,7 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <View style={{ alignItems: 'center' }}>
-              {focused && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#00D4AA', marginBottom: 4 }} />}
+              {focused && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent, marginBottom: 4 }} />}
               <Home size={22} color={color} />
             </View>
           ),
@@ -47,13 +50,13 @@ export default function TabLayout() {
               alignItems: 'center',
               justifyContent: 'center',
               ...(focused ? {
-                backgroundColor: '#1A1A2E',
+                backgroundColor: colors.surface,
                 borderRadius: 16,
                 width: 48,
                 height: 48,
                 marginTop: -8,
                 borderWidth: 1,
-                borderColor: '#252540',
+                borderColor: colors.cardBorder,
               } : {}),
             }}>
               <Camera size={22} color={color} />
@@ -67,7 +70,7 @@ export default function TabLayout() {
           title: 'History',
           tabBarIcon: ({ color, focused }) => (
             <View style={{ alignItems: 'center' }}>
-              {focused && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#00D4AA', marginBottom: 4 }} />}
+              {focused && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent, marginBottom: 4 }} />}
               <Clock size={22} color={color} />
             </View>
           ),
@@ -79,7 +82,7 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <View style={{ alignItems: 'center' }}>
-              {focused && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#00D4AA', marginBottom: 4 }} />}
+              {focused && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent, marginBottom: 4 }} />}
               <User size={22} color={color} />
             </View>
           ),

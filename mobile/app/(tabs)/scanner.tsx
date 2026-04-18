@@ -6,6 +6,8 @@ import { Bell, Zap, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import { useUserContext } from '../../context/UserContext';
+import { API_ENDPOINTS } from '../../lib/apiConfig';
 
 const { width, height } = Dimensions.get('window');
 
@@ -94,23 +96,14 @@ export default function Scanner() {
   const [analysisStep, setAnalysisStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
+  const { colors } = useUserContext();
 
   const analysisSteps = [
     'Capturing image...',
     'Identifying food items...',
     'Calculating nutrients...',
-    'Preparing results...',
+    'Finalizing results...',
   ];
-
-  useEffect(() => {
-    if (analyzing) {
-      // Cycle through analysis steps
-      const interval = setInterval(() => {
-        setAnalysisStep(prev => (prev < analysisSteps.length - 1 ? prev + 1 : prev));
-      }, 2500);
-      return () => clearInterval(interval);
-    }
-  }, [analyzing]);
 
   useEffect(() => {
     if (analyzing) {
@@ -125,31 +118,31 @@ export default function Scanner() {
   }, [analyzing]);
 
   if (!permission) {
-    return <View style={{ flex: 1, backgroundColor: '#0B0B12' }} />;
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0B0B12', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
         <View style={{
           width: 80, height: 80, borderRadius: 40,
-          backgroundColor: '#141420', alignItems: 'center', justifyContent: 'center',
-          marginBottom: 24, borderWidth: 1, borderColor: '#252540',
+          backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center',
+          marginBottom: 24, borderWidth: 1, borderColor: colors.cardBorder,
         }}>
-          <Zap size={32} color="#00D4AA" />
+          <Zap size={32} color={colors.accent} />
         </View>
-        <Text style={{ color: '#EEEEF0', fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center' }}>Camera Access Required</Text>
-        <Text style={{ color: '#555570', fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
+        <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center' }}>Camera Access Required</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
           Allow camera access to scan your food and get instant nutritional data.
         </Text>
         <TouchableOpacity
           onPress={requestPermission}
           style={{
-            backgroundColor: '#00D4AA', borderRadius: 16,
+            backgroundColor: colors.accent, borderRadius: 16,
             paddingVertical: 16, paddingHorizontal: 48,
           }}
         >
-          <Text style={{ color: '#0B0B12', fontSize: 16, fontWeight: '800' }}>Grant Permission</Text>
+          <Text style={{ color: colors.background, fontSize: 16, fontWeight: '800' }}>Grant Permission</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -171,7 +164,12 @@ export default function Scanner() {
         return;
       }
 
-      const response = await fetch('http://172.20.10.13:3000/api/analyze', {
+      // Start step rotation
+      const stepTimer = setInterval(() => {
+        setAnalysisStep(prev => (prev < 3 ? prev + 1 : prev));
+      }, 1200);
+
+      const response = await fetch(API_ENDPOINTS.ANALYZE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,23 +179,23 @@ export default function Scanner() {
         }),
       });
       const result = await response.json();
+      clearInterval(stepTimer);
 
       if (result.success && result.log) {
-        setAnalysisStep(3); // Final step
-        // Brief pause to show "Preparing results..." before navigating
+        setAnalysisStep(3);
         setTimeout(() => {
-          resetScanner();
           router.push({
             pathname: '/result',
-            params: { data: JSON.stringify(result.log) },
+            params: { data: JSON.stringify(result.log) }
           });
-        }, 800);
+          resetScanner();
+        }, 500);
       } else {
-        throw new Error(result.error || 'Analysis failed');
+        Alert.alert('Analysis Failed', 'Could not analyze image. Please try again.');
+        resetScanner();
       }
     } catch (e: any) {
-      console.error(e);
-      Alert.alert('Analysis Failed', 'Could not analyze image. Please try again.');
+      console.log('Capture error:', e);
       resetScanner();
     }
   };
@@ -208,43 +206,15 @@ export default function Scanner() {
     setAnalysisStep(0);
   };
 
-  // --- Analysis Overlay Screen ---
   if (analyzing) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0B0B12' }}>
-        {/* Blurred captured image background */}
-        {capturedUri && (
-          <Image
-            source={{ uri: capturedUri }}
-            style={{
-              position: 'absolute', width: '100%', height: '100%',
-              opacity: 0.15,
-            }}
-            blurRadius={20}
-          />
-        )}
+        <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          {/* Top Header Placeholder */}
+          <View style={{ position: 'absolute', top: 20 }}>
+             <ActivityIndicator color="#00D4AA" size="small" />
+          </View>
 
-        {/* Dark gradient overlay */}
-        <View style={{
-          position: 'absolute', width: '100%', height: '100%',
-          backgroundColor: '#0B0B12CC',
-        }} />
-
-        <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
-          {/* Cancel button */}
-          <TouchableOpacity
-            onPress={resetScanner}
-            style={{
-              position: 'absolute', top: 60, right: 24,
-              width: 40, height: 40, borderRadius: 20,
-              backgroundColor: '#1A1A2E', alignItems: 'center', justifyContent: 'center',
-              borderWidth: 1, borderColor: '#252540',
-            }}
-          >
-            <X size={18} color="#8888A0" />
-          </TouchableOpacity>
-
-          {/* Captured Image Preview */}
           {capturedUri && (
             <Animated.View style={{
               opacity: fadeAnim,
@@ -335,82 +305,82 @@ export default function Scanner() {
         style={{ flex: 1 }}
         facing="back"
         ref={(ref: any) => setCameraRef(ref)}
-      >
-        {/* Top Header Overlay */}
-        <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-          <View style={{
-            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-            paddingHorizontal: 20, paddingTop: 8,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#1A1A2E80', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 18 }}>👤</Text>
-              </View>
-              <Text style={{ color: '#EEEEF0', fontSize: 18, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>NutriSnap</Text>
+      />
+
+      {/* OVERLAYS (Absolute Positioned outside CameraView) */}
+      
+      {/* Top Header Overlay */}
+      <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+        <View style={{
+          flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+          paddingHorizontal: 20, paddingTop: 8,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#1A1A2E80', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 18 }}>👤</Text>
             </View>
-            <TouchableOpacity style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#14142080', alignItems: 'center', justifyContent: 'center' }}>
-              <Bell size={18} color="#8888A0" />
-            </TouchableOpacity>
+            <Text style={{ color: '#EEEEF0', fontSize: 18, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' }}>NutriSnap</Text>
           </View>
-        </SafeAreaView>
-
-        {/* Scanner Frame Overlay */}
-        <View style={{
-          position: 'absolute', top: 100, left: 24, right: 24, bottom: 160,
-          borderWidth: 2, borderColor: '#00D4AA40', borderRadius: 24,
-        }}>
-          {/* Corner accents */}
-          <View style={{ position: 'absolute', top: -1, left: -1, width: 28, height: 28, borderTopWidth: 3, borderLeftWidth: 3, borderColor: '#00D4AA', borderTopLeftRadius: 24 }} />
-          <View style={{ position: 'absolute', top: -1, right: -1, width: 28, height: 28, borderTopWidth: 3, borderRightWidth: 3, borderColor: '#00D4AA', borderTopRightRadius: 24 }} />
-          <View style={{ position: 'absolute', bottom: -1, left: -1, width: 28, height: 28, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: '#00D4AA', borderBottomLeftRadius: 24 }} />
-          <View style={{ position: 'absolute', bottom: -1, right: -1, width: 28, height: 28, borderBottomWidth: 3, borderRightWidth: 3, borderColor: '#00D4AA', borderBottomRightRadius: 24 }} />
+          <View style={{ width: 40, height: 40 }} />
         </View>
+      </SafeAreaView>
 
-        {/* Instruction Pill */}
-        <View style={{
-          position: 'absolute', top: 130, alignSelf: 'center',
-          backgroundColor: '#1A1A2E90', borderRadius: 20,
-          paddingVertical: 8, paddingHorizontal: 20,
-          flexDirection: 'row', alignItems: 'center', gap: 8,
-          borderWidth: 1, borderColor: '#25254040',
-        }}>
-          <Text style={{ fontSize: 12 }}>📸</Text>
-          <Text style={{ color: '#EEEEF0', fontSize: 12, fontWeight: '600' }}>Point at food & tap capture</Text>
-        </View>
+      {/* Scanner Frame Overlay */}
+      <View pointerEvents="none" style={{
+        position: 'absolute', top: 100, left: 24, right: 24, bottom: 160,
+        borderWidth: 2, borderColor: '#00D4AA40', borderRadius: 24,
+      }}>
+        {/* Corner accents */}
+        <View style={{ position: 'absolute', top: -1, left: -1, width: 28, height: 28, borderTopWidth: 3, borderLeftWidth: 3, borderColor: '#00D4AA', borderTopLeftRadius: 24 }} />
+        <View style={{ position: 'absolute', top: -1, right: -1, width: 28, height: 28, borderTopWidth: 3, borderRightWidth: 3, borderColor: '#00D4AA', borderTopRightRadius: 24 }} />
+        <View style={{ position: 'absolute', bottom: -1, left: -1, width: 28, height: 28, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: '#00D4AA', borderBottomLeftRadius: 24 }} />
+        <View style={{ position: 'absolute', bottom: -1, right: -1, width: 28, height: 28, borderBottomWidth: 3, borderRightWidth: 3, borderColor: '#00D4AA', borderBottomRightRadius: 24 }} />
+      </View>
 
-        {/* Bottom Capture Section */}
-        <View style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          alignItems: 'center', paddingBottom: 30,
-        }}>
-          <TouchableOpacity
-            onPress={snapFood}
-            activeOpacity={0.8}
-            style={{
-              width: 76, height: 76, borderRadius: 38,
-              backgroundColor: '#141420',
-              alignItems: 'center', justifyContent: 'center',
-              borderWidth: 3, borderColor: '#00D4AA40',
-            }}
-          >
-            <View style={{
-              width: 58, height: 58, borderRadius: 29,
-              backgroundColor: '#0B0B12',
-              alignItems: 'center', justifyContent: 'center',
-              borderWidth: 2, borderColor: '#00D4AA',
-            }}>
-              <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#00D4AA' }} />
-            </View>
-          </TouchableOpacity>
+      {/* Instruction Pill */}
+      <View pointerEvents="none" style={{
+        position: 'absolute', top: 130, alignSelf: 'center',
+        backgroundColor: '#1A1A2E90', borderRadius: 20,
+        paddingVertical: 8, paddingHorizontal: 20,
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        borderWidth: 1, borderColor: '#25254040',
+      }}>
+        <Text style={{ fontSize: 12 }}>📸</Text>
+        <Text style={{ color: '#EEEEF0', fontSize: 12, fontWeight: '600' }}>Point at food & tap capture</Text>
+      </View>
 
-          <Text style={{
-            color: '#555570', fontSize: 11, fontWeight: '600',
-            marginTop: 12, letterSpacing: 1.5, textTransform: 'uppercase',
+      {/* Bottom Capture Section */}
+      <View style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        alignItems: 'center', paddingBottom: 30,
+      }}>
+        <TouchableOpacity
+          onPress={snapFood}
+          activeOpacity={0.8}
+          style={{
+            width: 76, height: 76, borderRadius: 38,
+            backgroundColor: '#141420',
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 3, borderColor: '#00D4AA40',
+          }}
+        >
+          <View style={{
+            width: 58, height: 58, borderRadius: 29,
+            backgroundColor: '#0B0B12',
+            alignItems: 'center', justifyContent: 'center',
+            borderWidth: 2, borderColor: '#00D4AA',
           }}>
-            Tap to capture
-          </Text>
-        </View>
-      </CameraView>
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#00D4AA' }} />
+          </View>
+        </TouchableOpacity>
+
+        <Text style={{
+          color: '#555570', fontSize: 11, fontWeight: '600',
+          marginTop: 12, letterSpacing: 1.5, textTransform: 'uppercase',
+        }}>
+          Tap to capture
+        </Text>
+      </View>
     </View>
   );
 }
