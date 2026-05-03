@@ -1,7 +1,7 @@
-import { View, Text, ScrollView, TouchableOpacity, Dimensions, TextInput, Animated, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions, TextInput, Animated, Modal, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Bell, Camera, Send, Trash2, Plus, X, ChevronDown, Leaf, Image } from 'lucide-react-native';
+import { Bell, Camera, Send, Trash2, Plus, X, ChevronDown, Leaf, Image as ImageIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRef } from 'react';
@@ -170,10 +170,19 @@ export default function Dashboard() {
   const { dailyGoal, isLoaded, colors } = useUserContext();
   const [textQuery, setTextQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState(0);
+  const analysisSteps = [
+    "Processing Image...",
+    "Identifying Nutrients...",
+    "Finalizing Results..."
+  ];
   
   const [meals, setMeals] = useState<any[]>([]);
   const [manualModalVisible, setManualModalVisible] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const [galleryText, setGalleryText] = useState('');
+  const [galleryModalVisible, setGalleryModalVisible] = useState(false);
   const [manualForm, setManualForm] = useState({
     food_name: '', calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '',
   });
@@ -379,16 +388,31 @@ export default function Dashboard() {
 
       const pickerResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsEditing: false,
         quality: 0.5,
         base64: true,
       });
 
-      if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+      if (pickerResult.canceled || !pickerResult.assets?.[0]) {
+        return;
+      }
 
-      setLoading(true);
-      const asset = pickerResult.assets[0];
+      setSelectedAsset(pickerResult.assets[0]);
+      setGalleryText('');
+      setGalleryModalVisible(true);
+    } catch (e: any) {
+      Alert.alert('Error', 'Something went wrong picking the image.');
+    }
+  };
 
+  const confirmGalleryAnalysis = async () => {
+    if (!selectedAsset) return;
+    
+    setGalleryModalVisible(false);
+    setLoading(true);
+    setAnalysisStep(0);
+
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         Alert.alert('Auth Error', 'You must be logged in.');
@@ -396,29 +420,42 @@ export default function Dashboard() {
         return;
       }
 
+      const stepTimer = setInterval(() => {
+        setAnalysisStep(prev => (prev < 2 ? prev + 1 : prev));
+      }, 1500);
+
       const response = await fetch(API_ENDPOINTS.ANALYZE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: session.user.id,
-          imageBase64: asset.base64,
+          imageBase64: selectedAsset.base64,
           mimeType: 'image/jpeg',
+          textQuery: galleryText.trim() || undefined,
         }),
       });
+      
+      clearInterval(stepTimer);
       const result = await response.json();
 
       if (result.success && result.log) {
-        router.push({
-          pathname: '/result',
-          params: { data: JSON.stringify(result.log) },
-        });
+        setAnalysisStep(2);
+        setTimeout(() => {
+          router.push({
+            pathname: '/result',
+            params: { data: JSON.stringify(result.log) },
+          });
+          setGalleryText('');
+          setSelectedAsset(null);
+          setLoading(false);
+        }, 500);
       } else {
+        setLoading(false);
         Alert.alert('Analysis Failed', result.error || 'Could not analyze the image.');
       }
     } catch (e: any) {
-      Alert.alert('Error', 'Something went wrong picking the image.');
-    } finally {
       setLoading(false);
+      Alert.alert('Error', 'Something went wrong analyzing the image.');
     }
   };
 
@@ -561,7 +598,7 @@ export default function Dashboard() {
                 borderColor: colors.cardBorder,
               }}
             >
-              <Image size={18} color={colors.accent} />
+              <ImageIcon size={18} color={colors.accent} />
               <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '800' }}>Gallery</Text>
             </TouchableOpacity>
           </View>
@@ -801,6 +838,103 @@ export default function Dashboard() {
           </View>
         </TouchableOpacity>
       </TouchableOpacity>
+    </Modal>
+
+    {/* Gallery Pick Confirmation Modal */}
+    <Modal
+      visible={galleryModalVisible}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setGalleryModalVisible(false)}
+    >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' }}>
+          <View style={{
+            backgroundColor: colors.card,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingTop: 24,
+            paddingBottom: 40,
+            paddingHorizontal: 24,
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ color: colors.text, fontSize: 20, fontWeight: '800' }}>Review Photo</Text>
+              <TouchableOpacity onPress={() => setGalleryModalVisible(false)}>
+                <X size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedAsset && (
+              <View style={{ 
+                width: '100%', height: 200, borderRadius: 20, 
+                overflow: 'hidden', marginBottom: 20,
+                borderWidth: 1, borderColor: colors.cardBorder 
+              }}>
+                <Image source={{ uri: selectedAsset.uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              </View>
+            )}
+
+            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 }}>ANYTHING ELSE? (OPTIONAL)</Text>
+            <TextInput
+              placeholder="e.g. 2 pieces aloo, no sauce..."
+              placeholderTextColor={colors.textMuted}
+              value={galleryText}
+              onChangeText={setGalleryText}
+              style={{
+                backgroundColor: colors.background, borderRadius: 16, padding: 16, color: colors.text,
+                fontSize: 15, fontWeight: '600', borderWidth: 1, borderColor: colors.cardBorder, marginBottom: 24,
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={confirmGalleryAnalysis}
+              style={{
+                backgroundColor: colors.accent,
+                borderRadius: 20,
+                paddingVertical: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: colors.background, fontSize: 16, fontWeight: '800' }}>Start Analysis</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+
+    {/* Full Screen Loading Overlay */}
+    <Modal visible={loading} transparent animationType="fade">
+      <View style={{ flex: 1, backgroundColor: 'rgba(11, 11, 18, 0.95)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 }}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={{ color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 24, textAlign: 'center' }}>
+          Analyzing Food
+        </Text>
+        <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: '600', marginTop: 8, textAlign: 'center' }}>
+          {analysisSteps[analysisStep]}
+        </Text>
+        
+        {/* Progress Bar */}
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 32 }}>
+          {analysisSteps.map((_, i) => (
+            <View
+              key={i}
+              style={{
+                width: i <= analysisStep ? 30 : 10,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: i <= analysisStep ? colors.accent : colors.cardBorder,
+              }}
+            />
+          ))}
+        </View>
+
+        <View style={{ position: 'absolute', bottom: 60 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' }}>
+            Powered by Gemini AI
+          </Text>
+        </View>
+      </View>
     </Modal>
 
     </>
