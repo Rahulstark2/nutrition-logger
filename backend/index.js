@@ -47,6 +47,7 @@ app.post('/api/analyze', async (req, res) => {
 CRITICAL NUTRITIONAL REFERENCES:
 - A single home-style Roti is exactly 120 calories, containing 20g Carbs, 3g Protein, 0.8g Fat, and 2.5g Fiber. 
 - A 80g serving of Aloo Bhaji is exactly 130 calories, containing 20g Carbs, 1.8g Protein, 6g Fat, and 2.5g Fiber. 
+- If the item is "Dal-Full" from the PG and it is given as 1 foil pack, treat it as exactly 300 calories.
 - Ensure all other macro calculations are consistent with these values.
 
 IMPORTANT: The 'food_name' MUST reflect the exact item and quantity passed in (e.g., if the query is "1 banana", the food_name must literally be "1 banana", not just "banana").
